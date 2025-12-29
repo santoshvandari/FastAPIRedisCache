@@ -1,7 +1,7 @@
 import hashlib
 import json
 from functools import wraps
-from typing import Optional
+from typing import Optional,Callable
 
 from fastapi.logger import logger
 
@@ -26,13 +26,14 @@ def generate_cache_key(func_name: str, args: tuple, kwargs: dict) -> str:
     return f"{func_name}:{hashed}"
 
 
-def cache(expire: int = 60, key: Optional[str] = None, namespace: Optional[str] = None):
+def cache(expire: int = 60, key: Optional[str] = None, namespace: Optional[str] = None, key_builder: Optional[Callable] = None):
     """
     Decorator to cache endpoint responses in Redis.
     Args:
         expire: cache TTL in seconds
         key: optional custom key
         namespace: optional namespace prefix
+        key_builder: optional custom function to build cache key
     """
 
     def decorator(func):
@@ -41,8 +42,9 @@ def cache(expire: int = 60, key: Optional[str] = None, namespace: Optional[str] 
             # If Redis not initialized → run without cache
             if redis_cache is None:
                 return await func(*args, **kwargs)
-
-            if key:
+            if key_builder:
+                final_key = key_builder(*args, **kwargs)
+            elif key:
                 final_key = key
             else:
                 final_key = generate_cache_key(func.__name__, args, kwargs)

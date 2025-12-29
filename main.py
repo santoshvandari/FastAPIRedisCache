@@ -153,3 +153,20 @@ async def no_cache_endpoint():
         "message": "This endpoint is not cached",
         "timestamp": asyncio.get_event_loop().time()
     }
+
+# Example 8: Custom key builder function
+def custom_key_builder(*args, **kwargs) -> str:
+    user_id = kwargs.get("user_id", "unknown")
+    return f"custom_user_key:{user_id}"
+
+# Endpoint using custom key builder
+@app.get("/custom-key/{user_id}")
+@cache(expire=150, key_builder=custom_key_builder)
+async def get_custom_key_user(user_id: int):
+    """Get user with custom key builder for caching"""
+    await asyncio.sleep(1)
+    return {
+        "user_id": user_id,
+        "name": f"CustomUser_{user_id}",
+        "timestamp": asyncio.get_event_loop().time()
+    }
