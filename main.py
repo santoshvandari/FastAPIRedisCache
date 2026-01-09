@@ -5,7 +5,6 @@ from redis_cache.cache import set_redis_instance as set_cache_instance
 from redis_cache.clear import set_redis_instance as set_clear_instance
 import asyncio
 import logging
-from typing import Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +18,6 @@ async def lifespan(app: FastAPI):
     redis_client = RedisCacheInit(
         hostname="localhost",
         port=6379,
-        namespace="fastapi_app",
         timeout=5
     )
     cache_instance = await redis_client.initialize()
@@ -117,7 +115,7 @@ async def get_stats():
 
 # Example 5: Clear specific cache
 @app.delete("/cache/clear")
-async def clear_specific_cache(key: Optional[str] = None, namespace: Optional[str] = None):
+async def clear_specific_cache(key: str | None = None, namespace: str | None = None):
     """Clear specific cache by key and/or namespace"""
     try:
         await clear_cache(key=key, namespace=namespace)

@@ -1,13 +1,13 @@
-from aiocache import caches
-from fastapi.logger import logger
+from aiocache import caches, Cache
+from .logger_config import logger
 
 
 class RedisCacheInit:
-    def __init__(self, hostname="localhost", port=6379, timeout=5):
-        self.hostname = hostname
-        self.port = port
-        self.timeout = timeout
-        self.cache = None
+    def __init__(self, hostname: str = "localhost", port: int = 6379, timeout: int = 5):
+        self.hostname: str = hostname
+        self.port: int = port
+        self.timeout: int = timeout
+        self.cache: Cache | None= None
 
     async def initialize(self):
         try:

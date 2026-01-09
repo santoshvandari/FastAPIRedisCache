@@ -1,14 +1,15 @@
 import hashlib
 import json
 from functools import wraps
-from typing import Optional,Callable
+from typing import Callable
 
 from fastapi.logger import logger
+from aiocache import Cache
 
-redis_cache = None
+redis_cache: Cache | None = None
 
 
-def set_redis_instance(redis_instance):
+def set_redis_instance(redis_instance: Cache) -> None:
     global redis_cache
     redis_cache = redis_instance
 
@@ -26,7 +27,7 @@ def generate_cache_key(func_name: str, args: tuple, kwargs: dict) -> str:
     return f"{func_name}:{hashed}"
 
 
-def cache(expire: int = 60, key: Optional[str] = None, namespace: Optional[str] = None, key_builder: Optional[Callable] = None):
+def cache(expire: int = 60, key: str | None = None, namespace: str | None = None, key_builder: Callable | None = None):
     """
     Decorator to cache endpoint responses in Redis.
     Args:

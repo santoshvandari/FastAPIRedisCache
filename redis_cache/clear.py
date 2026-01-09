@@ -1,15 +1,15 @@
-from typing import Any, List, Optional
+from aiocache import Cache
 
-redis_cache: Any = None
+redis_cache: Cache | None = None
 
 
-def set_redis_instance(redis_instance: Any) -> None:
+def set_redis_instance(redis_instance: Cache) -> None:
     global redis_cache
     redis_cache = redis_instance
 
 
 async def clear_cache(
-    key: Optional[str] = None, namespace: Optional[str] = None
+    key: str | None = None, namespace: str | None = None
 ) -> None:
     """
     Clear Redis cache:
