@@ -12,27 +12,17 @@
 
 ## Key Features
 
-- **🎯 Simple Decorator API**: Cache any endpoint with a single `@cache()` decorator.
-- **🧠 Smart Key Generation**: Automatically handles function arguments, path parameters, and query parameters.
-- **🛡️ Graceful Resilience**: Production-ready "fail-open" logic. If Redis goes down, your API keeps running without caching.
-- **🌐 Modern Lifespan Pattern**: Uses `asynccontextmanager` for clean resource initialization and cleanup, following latest FastAPI best practices.
-- **🏷️ Namespace Support**: Organize your cache entries into logical groups (e.g., `users`, `products`) for easier management.
-- **🧹 Flexible Invalidation**: Clear specific keys, entire namespaces, or the whole cache with ease.
-- **⚙️ Dependency Filtering**: Intelligent filtering to exclude non-cacheable dependencies (like DB sessions or S3 clients) from key generation.
+- **Simple Decorator API**: Cache any endpoint with a single `@cache()` decorator.
+- **Smart Key Generation**: Automatically handles function arguments, path parameters, and query parameters.
+- **Graceful Resilience**: Production-ready "fail-open" logic. If Redis goes down, your API keeps running without caching.
+- **Modern Lifespan Pattern**: Uses `asynccontextmanager` for clean resource initialization and cleanup, following latest FastAPI best practices.
+- **Namespace Support**: Organize your cache entries into logical groups (e.g., `users`, `products`) for easier management.
+- **Flexible Invalidation**: Clear specific keys, entire namespaces, or the whole cache with ease.
+- **Dependency Filtering**: Intelligent filtering to exclude non-cacheable dependencies (like DB sessions or S3 clients) from key generation.
 
 ---
 
-## 📈 Performance Impact
-
-| Scenario | Latency | Source |
-| :--- | :--- | :--- |
-| **Without Cache** | ~250ms | Simulated DB Query |
-| **With FastCacheRedis** | **~5ms** | Redis Cache Hit |
-| **Improvement** | **50x Faster** | ⚡⚡⚡ |
-
----
-
-## 🛠️ Installation
+## Installation
 
 ```bash
 # Clone the repository
@@ -45,9 +35,10 @@ pip install -r requirements.txt
 
 ---
 
-## 🏮 Quick Start
+## Quick Start
 
 ### 1. Initialize the Cache
+
 Set up the Redis client using the modern FastAPI lifespan pattern in `main.py`:
 
 ```python
@@ -66,11 +57,11 @@ async def lifespan(app: FastAPI):
         dependency=["db_session", "s3_client"] # Exclude these from cache keys
     )
     cache_instance = await redis_client.initialize()
-    
+
     if cache_instance:
         set_cache_instance(cache_instance)
         set_clear_instance(cache_instance)
-    
+
     yield
     # Shutdown logic goes here
 
@@ -78,6 +69,7 @@ app = FastAPI(lifespan=lifespan)
 ```
 
 ### 2. Cache an Endpoint
+
 Just add the `@cache` decorator to your route!
 
 ```python
@@ -85,22 +77,22 @@ Just add the `@cache` decorator to your route!
 @cache(expire=300, namespace="catalog")
 async def get_product(product_id: int):
     # Simulate an expensive database operation
-    await asyncio.sleep(1.5) 
+    await asyncio.sleep(1.5)
     return {"id": product_id, "name": "Premium Gadget", "price": 99.99}
 ```
 
 ---
 
-## 📖 Usage Guide
+## Usage Guide
 
 ### Caching Options
 
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `expire` | `int` | `60` | Time-to-Live (TTL) in seconds. |
-| `namespace` | `str` | `None` | Optional prefix to group keys. |
-| `key` | `str` | `None` | Static key name (overrides automatic generation). |
-| `key_builder` | `Callable`| `None` | Custom function to generate complex keys. |
+| Parameter     | Type       | Default | Description                                       |
+| :------------ | :--------- | :------ | :------------------------------------------------ |
+| `expire`      | `int`      | `60`    | Time-to-Live (TTL) in seconds.                    |
+| `namespace`   | `str`      | `None`  | Optional prefix to group keys.                    |
+| `key`         | `str`      | `None`  | Static key name (overrides automatic generation). |
+| `key_builder` | `Callable` | `None`  | Custom function to generate complex keys.         |
 
 ### Manual Cache Invalidation
 
@@ -119,24 +111,21 @@ await clear_cache()
 
 ---
 
-## 🔬 How It Works
+## How It Works
 
 1. **Key Generation**: When a request hits a cached endpoint, `FastCacheRedis` generates a unique MD5 hash based on the function name and its input arguments.
-2. **Dependency Exclusion**: It automatically strips out common dependencies (like database sessions) from the hash calculation to ensure the same data returns the same key regardless of the session state.
-3. **Serialization**: Responses are serialized into JSON and stored in Redis. On retrieval, they are automatically parsed back into Python dictionaries/lists.
-4. **Fallback**: If the Redis server is unreachable, the system catches the exception, logs a warning, and executes the original function directly—ensuring 100% uptime.
+2. **Dependency Exclusion**: It automatically strips out dependencies that are defined in Initialization (like database sessions) from the hash calculation to ensure the same data returns the same key regardless of the session state.
+3. **Fallback**: If the Redis server is unreachable, the system catches the exception, logs a warning, and executes the original function directly—ensuring 100% uptime.
 
 ---
 
-## 🛤️ Roadmap
-- [ ] **Pydantic Support**: Native serialization for complex Pydantic models.
-- [ ] **L2 In-Memory Cache**: Secondary local memory fallback for even faster lookups.
-- [ ] **Circuit Breaker**: Advanced detection for Redis health to prevent repeated connection attempts during outages.
+## Contributing
 
----
+We welcome contributions from the community! Please follow our [contributing guidelines](CONTRIBUTING.md).
 
-## 📝 License
+Code of Conduct
+Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project, you agree to abide by its terms.
+
+## License
+
 This project is open-source and available under the MIT License.
-
----
-Created with ❤️ by [Santosh Vandari](https://github.com/santoshvandari)
