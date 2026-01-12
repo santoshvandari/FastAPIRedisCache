@@ -5,29 +5,48 @@ from typing import Callable
 
 from fastapi.logger import logger
 from aiocache import Cache
+from .client import DEPENDENCY_CACHE_KEY_EXCLUDE
 
 redis_cache: Cache | None = None
 
 
 def set_redis_instance(redis_instance: Cache) -> None:
+    """
+    Set the Redis cache instance.
+    Args:
+        redis_instance (Cache): The Redis cache instance.
+    """
     global redis_cache
     redis_cache = redis_instance
 
 
 def generate_cache_key(func_name: str, args: tuple, kwargs: dict) -> str:
+    """
+    Function that generate unique cache key based on function name, arguments and keyword arguments.
+    Args:
+        func_name (str): The name of the function.
+        args (tuple): The arguments of the function.
+        kwargs (dict): The keyword arguments of the function.
+    Returns:
+        str: The generated cache key.
+    """
     # Drop injected dependencies
     clean_kwargs = {
         k: v
         for k, v in kwargs.items()
-        if k not in ("db", "s3_client_public", "s3_client", "qdrant_db")
-        and v is not None
+        if k not in DEPENDENCY_CACHE_KEY_EXCLUDE and v is not None
     }
     raw = f"{args}:{clean_kwargs}"
     hashed = hashlib.md5(raw.encode()).hexdigest()[:12]
     return f"{func_name}:{hashed}"
 
 
-def cache(expire: int = 60, key: str | None = None, namespace: str | None = None, key_builder: Callable | None = None):
+def cache(
+    expire: int = 60,
+    key: str | None = None,
+    namespace: str | None = None,
+    key_builder: Callable | None = None,
+):
     """
     Decorator to cache endpoint responses in Redis.
     Args:
