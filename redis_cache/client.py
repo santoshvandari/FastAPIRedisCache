@@ -10,7 +10,7 @@ class RedisCacheInit:
         hostname: str = "localhost",
         port: int = 6379,
         timeout: int = 5,
-        dependency: list[str] = [],
+        dependency: list[str] | None = None,
     ):
         """
         Initialize the Redis cache client with the given parameters.
@@ -24,9 +24,13 @@ class RedisCacheInit:
         self.port: int = port
         self.timeout: int = timeout
         self.cache: Cache | None = None
-        DEPENDENCY_CACHE_KEY_EXCLUDE: list[str] = dependency
+        
+        global DEPENDENCY_CACHE_KEY_EXCLUDE
+        DEPENDENCY_CACHE_KEY_EXCLUDE.clear()
+        if dependency:
+            DEPENDENCY_CACHE_KEY_EXCLUDE.extend(dependency)
 
-    async def initialize(self):
+    async def initialize(self) -> Cache | None:
         """
         Initialize the Redis cache client.
         """
@@ -42,9 +46,15 @@ class RedisCacheInit:
                 }
             )
 
-            self.cache = caches.get("default")
+            cache_instance = caches.get("default")
+            if not isinstance(cache_instance, Cache):
+                logger.error("Failed to get Cache instance from aiocache")
+                return None
+
+            self.cache = cache_instance
 
             try:
+                # Test connection
                 await self.cache.get("test")
                 logger.info("Redis cache connected successfully.")
             except Exception:
