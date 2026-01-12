@@ -5,7 +5,6 @@ from redis_cache.cache import set_redis_instance as set_cache_instance
 from redis_cache.clear import set_redis_instance as set_clear_instance
 import asyncio
 import logging
-from typing import Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,20 +18,20 @@ async def lifespan(app: FastAPI):
     redis_client = RedisCacheInit(
         hostname="localhost",
         port=6379,
-        namespace="fastapi_app",
-        timeout=5
+        timeout=5,
+        dependency=["db", "s3_client_public", "s3_client"], # Can add all the dependency value that are dynamic
     )
     cache_instance = await redis_client.initialize()
-    
+
     if cache_instance:
         set_cache_instance(cache_instance)
         set_clear_instance(cache_instance)
         logger.info("Redis cache initialized successfully")
     else:
         logger.warning("Running without Redis cache")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Application shutdown")
 
@@ -41,7 +40,7 @@ app = FastAPI(
     title="FastAPI Redis Caching Example",
     version="1.0.0",
     description="Example application demonstrating Redis caching with FastAPI",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
@@ -62,7 +61,7 @@ async def root():
     return {
         "message": "Hello World",
         "timestamp": asyncio.get_event_loop().time(),
-        "note": "This response is cached for 60 seconds"
+        "note": "This response is cached for 60 seconds",
     }
 
 
@@ -73,14 +72,14 @@ async def get_user(user_id: int):
     """Get user by ID with namespace caching"""
     if user_id < 1:
         raise HTTPException(status_code=400, detail="Invalid user ID")
-    
+
     # Simulate database query
     await asyncio.sleep(1)
     return {
         "user_id": user_id,
         "name": f"User_{user_id}",
         "email": f"user{user_id}@example.com",
-        "timestamp": asyncio.get_event_loop().time()
+        "timestamp": asyncio.get_event_loop().time(),
     }
 
 
@@ -91,14 +90,14 @@ async def get_products(category: str = "all", limit: int = 10):
     """Get products with category and limit filters"""
     if limit < 1 or limit > 100:
         raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
-    
+
     # Simulate expensive query
     await asyncio.sleep(1.5)
     return {
         "category": category,
         "limit": limit,
         "products": [f"Product_{i}" for i in range(limit)],
-        "timestamp": asyncio.get_event_loop().time()
+        "timestamp": asyncio.get_event_loop().time(),
     }
 
 
@@ -111,19 +110,19 @@ async def get_stats():
     return {
         "total_users": 1000,
         "active_sessions": 42,
-        "timestamp": asyncio.get_event_loop().time()
+        "timestamp": asyncio.get_event_loop().time(),
     }
 
 
 # Example 5: Clear specific cache
 @app.delete("/cache/clear")
-async def clear_specific_cache(key: Optional[str] = None, namespace: Optional[str] = None):
+async def clear_specific_cache(key: str | None = None, namespace: str | None = None):
     """Clear specific cache by key and/or namespace"""
     try:
         await clear_cache(key=key, namespace=namespace)
         return {
             "status": "success",
-            "message": f"Cache cleared for key={key}, namespace={namespace}"
+            "message": f"Cache cleared for key={key}, namespace={namespace}",
         }
     except Exception as e:
         logger.error(f"Failed to clear cache: {e}")
@@ -136,10 +135,7 @@ async def clear_all_cache():
     """Clear all cache entries"""
     try:
         await clear_cache()
-        return {
-            "status": "success",
-            "message": "All cache cleared"
-        }
+        return {"status": "success", "message": "All cache cleared"}
     except Exception as e:
         logger.error(f"Failed to clear all cache: {e}")
         raise HTTPException(status_code=500, detail="Failed to clear all cache")
@@ -151,13 +147,15 @@ async def no_cache_endpoint():
     """Example endpoint without caching"""
     return {
         "message": "This endpoint is not cached",
-        "timestamp": asyncio.get_event_loop().time()
+        "timestamp": asyncio.get_event_loop().time(),
     }
+
 
 # Example 8: Custom key builder function
 def custom_key_builder(*args, **kwargs) -> str:
     user_id = kwargs.get("user_id", "unknown")
     return f"custom_user_key:{user_id}"
+
 
 # Endpoint using custom key builder
 @app.get("/custom-key/{user_id}")
@@ -168,5 +166,5 @@ async def get_custom_key_user(user_id: int):
     return {
         "user_id": user_id,
         "name": f"CustomUser_{user_id}",
-        "timestamp": asyncio.get_event_loop().time()
+        "timestamp": asyncio.get_event_loop().time(),
     }

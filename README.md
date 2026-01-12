@@ -1,193 +1,131 @@
-# FastAPI Redis Caching
+# FastAPI Redis Cache
 
-A simple and elegant Redis caching solution for FastAPI applications using decorators.
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org)
 
-## Features
+**FastAPI Redis Cache** is a lightweight, decorator-based middleware designed to make high-performance API development effortless. By wrapping standard FastAPI routes with a simple `@cache()` decorator, developers can reduce database load and slash response times from hundreds of milliseconds to near-instant.
 
--  Easy-to-use decorator-based caching
-- Automatic cache key generation with dependency filtering
-- Customizable TTL (Time To Live)
-- Namespace support for organized caching
-- Custom cache keys
-- Flexible cache clearing (specific keys, namespaces, or all)
-- Graceful fallback when Redis is unavailable
+![Project Banner](banner.png)
+
+---
+
+## Key Features
+
+- **Simple Decorator API**: Cache any endpoint with a single `@cache()` decorator.
+- **Smart Key Generation**: Automatically handles function arguments, path parameters, and query parameters.
+- **Graceful Resilience**: Production-ready "fail-open" logic. If Redis goes down, your API keeps running without caching.
+- **Modern Lifespan Pattern**: Uses `asynccontextmanager` for clean resource initialization and cleanup, following latest FastAPI best practices.
+- **Namespace Support**: Organize your cache entries into logical groups (e.g., `users`, `products`) for easier management.
+- **Flexible Invalidation**: Clear specific keys, entire namespaces, or the whole cache with ease.
+- **Dependency Filtering**: Intelligent filtering to exclude non-cacheable dependencies (like DB sessions or S3 clients) from key generation.
+
+---
 
 ## Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/santoshvandari/FastAPIRedisCache.git
+cd FastAPIRedisCache
+
 # Install dependencies
 pip install -r requirements.txt
-
-# Or manually
-pip install fastapi uvicorn aiocache redis
 ```
 
-## Project Structure
-
-```
-fastapi_caching/
-├── main.py              # Example FastAPI application
-├── redis_cache/
-│   ├── __init__.py      # Package exports
-│   ├── cache.py         # Cache decorator with logging
-│   ├── clear.py         # Cache clearing utilities
-│   └── client.py        # Redis client initialization
-├── requirements.txt     # Python dependencies
-└── README.md            # This file
-```
+---
 
 ## Quick Start
 
-### 1. Start Redis Server
+### 1. Initialize the Cache
 
-```bash
-# Using Docker
-docker run -d -p 6379:6379 redis:latest
-
-# Or install locally and run
-redis-server
-```
-
-### 2. Run the Application
-
-```bash
-uvicorn main:app --reload
-```
-
-### 3. Test the Endpoints
-
-Visit `http://localhost:8000/docs` for interactive API documentation.
-
-## Usage Examples
-
-### Basic Setup (Modern Lifespan)
+Set up the Redis client using the modern FastAPI lifespan pattern in `main.py`:
 
 ```python
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from redis_cache import cache, RedisCacheInit, clear_cache
+from redis_cache import cache, RedisCacheInit
 from redis_cache.cache import set_redis_instance as set_cache_instance
 from redis_cache.clear import set_redis_instance as set_clear_instance
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup: Initialize Redis
     redis_client = RedisCacheInit(
         hostname="localhost",
         port=6379,
-        timeout=5
+        dependency=["db_session", "s3_client"] # Exclude these from cache keys
     )
     cache_instance = await redis_client.initialize()
-    
+
     if cache_instance:
         set_cache_instance(cache_instance)
         set_clear_instance(cache_instance)
-    
+
     yield
-    
-    # Shutdown
-    await redis_client.close()
+    # Shutdown logic goes here
 
 app = FastAPI(lifespan=lifespan)
 ```
 
-### Simple Caching
+### 2. Cache an Endpoint
+
+Just add the `@cache` decorator to your route!
 
 ```python
-@app.get("/data")
-@cache(expire=60)  # Cache for 60 seconds
-async def get_data():
-    return {"message": "This is cached"}
+@app.get("/products/{product_id}")
+@cache(expire=300, namespace="catalog")
+async def get_product(product_id: int):
+    # Simulate an expensive database operation
+    await asyncio.sleep(1.5)
+    return {"id": product_id, "name": "Premium Gadget", "price": 99.99}
 ```
 
-### Caching with Namespace
+---
+
+## Usage Guide
+
+### Caching Options
+
+| Parameter     | Type       | Default | Description                                       |
+| :------------ | :--------- | :------ | :------------------------------------------------ |
+| `expire`      | `int`      | `60`    | Time-to-Live (TTL) in seconds.                    |
+| `namespace`   | `str`      | `None`  | Optional prefix to group keys.                    |
+| `key`         | `str`      | `None`  | Static key name (overrides automatic generation). |
+| `key_builder` | `Callable` | `None`  | Custom function to generate complex keys.         |
+
+### Manual Cache Invalidation
 
 ```python
-@app.get("/user/{user_id}")
-@cache(expire=300, namespace="users")
-async def get_user(user_id: int):
-    return {"user_id": user_id, "name": f"User_{user_id}"}
-```
+from redis_cache import clear_cache
 
-### Custom Cache Key
+# Clear a specific key in a namespace
+await clear_cache(key="product_123", namespace="catalog")
 
-```python
-@app.get("/stats")
-@cache(expire=180, key="global_stats", namespace="analytics")
-async def get_stats():
-    return {"total_users": 1000}
-```
+# Clear an entire namespace
+await clear_cache(namespace="catalog")
 
-### Clearing Cache
-
-```python
-# Clear specific key in namespace
-await clear_cache(key="user_123", namespace="users")
-
-# Clear all keys in namespace
-await clear_cache(namespace="users")
-
-# Clear specific key
-await clear_cache(key="my_key")
-
-# Clear all cache
+# Wipe the entire cache
 await clear_cache()
 ```
 
-## Configuration Options
-
-### RedisCacheInit Parameters
-
-- `hostname` (str): Redis server hostname (default: "localhost")
-- `port` (int): Redis server port (default: 6379)
-- `timeout` (int): Connection timeout in seconds (default: 5)
-
-### Cache Decorator Parameters
-
-- `expire` (int): Cache TTL in seconds (default: 60)
-- `key` (str, optional): Custom cache key
-- `namespace` (str, optional): Namespace prefix for the cache key
-- `key_builder` (Callable, optional): Custom function to build cache key
+---
 
 ## How It Works
 
-1. **Automatic Key Generation**: If no custom key is provided, the decorator generates a unique key based on the function name and arguments (with dependency filtering)
-2. **Fallback Mode**: If Redis is unavailable, endpoints continue to work without caching
-3. **JSON Serialization**: Responses are automatically serialized/deserialized
-4. **Logging**: Debug logs for cache hits/misses, errors are logged with context
+1. **Key Generation**: When a request hits a cached endpoint, `FastCacheRedis` generates a unique MD5 hash based on the function name and its input arguments.
+2. **Dependency Exclusion**: It automatically strips out dependencies that are defined in Initialization (like database sessions) from the hash calculation to ensure the same data returns the same key regardless of the session state.
+3. **Fallback**: If the Redis server is unreachable, the system catches the exception, logs a warning, and executes the original function directly—ensuring 100% uptime.
 
+---
 
+## Contributing
 
-## Best Practices
+We welcome contributions from the community! Please follow our [contributing guidelines](CONTRIBUTING.md).
 
-1. **Set appropriate TTL**: Short TTL for frequently changing data, longer for static content
-2. **Use namespaces**: Organize related caches for easier management
-3. **Monitor Redis**: Keep an eye on memory usage and eviction policies
-4. **Test fallback**: Ensure your app works when Redis is down
-5. **Clear strategically**: Use namespace clearing for bulk invalidation
-6. **Enable debug logging**: Set `LOG_LEVEL=DEBUG` to see cache hits/misses
-7. **Handle dependencies**: Use dependency filtering to avoid caching session data
+Code of Conduct
+Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project, you agree to abide by its terms.
 
-## Troubleshooting
+## License
 
-### Redis Connection Failed
-
-- Ensure Redis is running: `redis-cli ping` should return `PONG`
-- Check hostname and port in configuration
-- Verify firewall rules if Redis is on a remote server
-- Check logs for detailed error messages
-
-### Cache Not Working
-
-- Check logs for Redis initialization messages
-- Verify the decorator is applied before the route decorator
-- Ensure `set_redis_instance` is called during startup
-- Enable debug logging to see cache operations
-- Check if namespace is correctly set
-
-### Performance Issues
-
-- Monitor Redis memory usage: `redis-cli info memory`
-- Check for large cached values
-- Consider using shorter TTLs for less important data
-- Use Redis MONITOR command to debug: `redis-cli monitor`
+This project is open-source and available under the MIT License.
